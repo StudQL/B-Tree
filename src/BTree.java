@@ -11,9 +11,7 @@ public class BTree {
     final int max_keys;
     final int min_children;
 
-    enum executionType {single_thread, multi_thread, spark}
-
-    ;
+    enum executionType {single_thread, multi_thread, spark};
     Node rootNode;
     AbstractExecutioner single_executioner = new SingleExecutioner(this);
     AbstractExecutioner multi_executioner = new MultiExecutioner(this);
@@ -32,7 +30,7 @@ public class BTree {
         Node leftSibling = null;
         Node rightSibling = null;
         Node parentNode = null;
-        Node[] childrenNode = null;
+        Node[] childrenNode = new Node[M];
         boolean isRoot;
         boolean isLeaf;
         int used_slots = 0; // UPDATE A CHAQUE INSERTION ET DELETION D'UN ELEMENT
@@ -88,19 +86,23 @@ public class BTree {
             addEntry(entry);
         }
 
-        void removeEntry(int key) throws Exception {
-            int i = getKeyIndex(key);
-            if (i == -1) {
-                throw new Exception("Key not found");
-            }
-            this.entries[i] = null;
+        void removeEntryAtIndex(int index){
+            this.entries[index] = null;
             this.used_slots--;
-            for (int j = i + 1; j <= this.used_slots; j++) {
+            for (int j = index + 1; j <= this.used_slots; j++) {
                 this.entries[j - 1] = this.entries[j];
                 if (j == this.used_slots) {
                     this.entries[j] = null;
                 }
             }
+        }
+
+        void removeEntry(int key) throws Exception {
+            int i = getKeyIndex(key);
+            if (i == -1) {
+                throw new Exception("Key not found");
+            }
+            removeEntryAtIndex(i);
         }
 
         void removeEntry(Entry entry) throws Exception {
@@ -122,6 +124,15 @@ public class BTree {
             Entry e = this.entries[0];
             removeEntry(e);
             return e;
+        }
+
+        int getChildNodePosition(Node n){
+            for(int i = 0; i < M; i++){
+                if (childrenNode[i].equals(n)){
+                    return i;
+                }
+            }
+            return -1;
         }
 
         @Override
@@ -147,6 +158,38 @@ public class BTree {
                     "key=" + key +
                     ", value=" + value +
                     '}';
+        }
+
+        Node getLeftChild(){
+            if (selfNode.isLeaf){
+                return null;
+            }
+            int index_in_node = selfNode.getKeyIndex(key);
+            return selfNode.childrenNode[index_in_node];
+        }
+
+        Node getRightChild(){
+            if (selfNode.isLeaf){
+                return null;
+            }
+            int index_in_node = selfNode.getKeyIndex(key);
+            return selfNode.childrenNode[index_in_node+1];
+        }
+
+        Entry getInorderPredecessor(){
+            Node current = getLeftChild();
+            while (!current.isLeaf){
+                current = current.entries[current.used_slots-1].getRightChild();
+            }
+            return current.entries[current.used_slots-1];
+        }
+
+        Entry getInorderSuccessor(){
+            Node current = getRightChild();
+            while (!current.isLeaf){
+                current = current.entries[0].getLeftChild();
+            }
+            return current.entries[0];
         }
     }
 
