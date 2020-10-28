@@ -55,77 +55,94 @@ public class BTree {
             return -1;
         }
 
-        int getKeyIndex(Entry entry) {
-            return getKeyIndex(entry.key);
-        }
-
-        void addEntryAtIndex(Entry entry, int index) {
-            for (int j = this.used_slots - 1; index <= j; j--) {
-                this.entries[j + 1] = this.entries[j];
-            }
-            this.entries[index] = entry;
-            entry.selfNode = this;
-            this.used_slots++;
-        }
-
-        void addEntry(Entry entry) throws Exception {
-            if (this.used_slots == max_keys) {
-                throw new Exception("Array already full");
-            }
-            int i = 0;
-            for (; i < this.used_slots; i++) {
-                if (this.entries[i].key >= entry.key) {
-                    break;
-                }
-            }
-            addEntryAtIndex(entry, i);
-        }
-
-        void addEntry(int key, Object value) throws Exception {
-            Entry entry = new Entry(key, value);
-            addEntry(entry);
-        }
-
-        void removeEntryAtIndex(int index){
-            this.entries[index] = null;
-            this.used_slots--;
-            for (int j = index + 1; j <= this.used_slots; j++) {
-                this.entries[j - 1] = this.entries[j];
-                if (j == this.used_slots) {
-                    this.entries[j] = null;
-                }
-            }
-        }
-
-        void removeEntry(int key) throws Exception {
-            int i = getKeyIndex(key);
-            if (i == -1) {
-                throw new Exception("Key not found");
-            }
-            removeEntryAtIndex(i);
-        }
-
-        void removeEntry(Entry entry) throws Exception {
-            removeEntry(entry.key);
-        }
-
-        Entry pollLastEntry() throws Exception {
-            for (int i = max_keys - 1; i >= min_keys; i--) {
-                if (this.entries[i] != null) {
-                    Entry e = this.entries[i];
-                    this.entries[i] = null;
-                    return e;
-                }
-            }
-            return null;
-        }
-
-        Entry pollFirstEntry() throws Exception {
-            Entry e = this.entries[0];
-            removeEntry(e);
-            return e;
-        }
-
+//        int getKeyIndex(Entry entry) {
+//            return getKeyIndex(entry.key);
+//        }
+//
+//        void addEntryAtIndex(Entry entry, int index) {
+//            for (int j = this.used_slots - 1; index <= j; j--) {
+//                this.entries[j + 1] = this.entries[j];
+//            }
+//            this.entries[index] = entry;
+//            entry.selfNode = this;
+//            this.used_slots++;
+//        }
+//
+//        void addEntry(Entry entry) throws Exception {
+//            if (this.used_slots == max_keys) {
+//                throw new Exception("Array already full");
+//            }
+//            int i = 0;
+//            for (; i < this.used_slots; i++) {
+//                if (this.entries[i].key >= entry.key) {
+//                    break;
+//                }
+//            }
+//            addEntryAtIndex(entry, i);
+//        }
+//
+//        void addEntry(int key, Object value) throws Exception {
+//            Entry entry = new Entry(key, value);
+//            addEntry(entry);
+//        }
+//
+//        void removeEntryAtIndex(int index){
+//            this.entries[index] = null;
+//            this.used_slots--;
+//            for (int j = index + 1; j <= this.used_slots; j++) {
+//                this.entries[j - 1] = this.entries[j];
+//                if (j == this.used_slots) {
+//                    this.entries[j] = null;
+//                }
+//            }
+//        }
+//
+//        void removeEntry(int key) throws Exception {
+//            int i = getKeyIndex(key);
+//            if (i == -1) {
+//                throw new Exception("Key not found");
+//            }
+//            removeEntryAtIndex(i);
+//        }
+//
+//        void removeEntry(Entry entry) throws Exception {
+//            removeEntry(entry.key);
+//        }
+//
+//        Entry pollLastEntry() throws Exception {
+//            Entry e = this.entries[used_slots-1];
+//            removeEntry(e);
+//            return e;
+//        }
+//
+//        Entry pollFirstEntry() throws Exception {
+//            Entry e = this.entries[0];
+//            removeEntry(e);
+//            return e;
+//        }
+//
+//        void removeNodeAtIndex(int index){
+//            this.childrenNode[index] = null;
+//            for (int j = index + 1; j <= this.used_slots; j++) {
+//                this.childrenNode[j - 1] = this.childrenNode[j];
+//                if (j == this.used_slots) {
+//                    this.childrenNode[j] = null;
+//                }
+//            }
+//        }
+//
+//        Node pollFirstChildNode() throws Exception {
+//            Node n = this.childrenNode[0];
+//            removeNodeAtIndex(0);
+//            return n;
+//        }
+//
+//        Node pollLastChildNode() {
+//            Node n = this.childrenNode[0];
+//            removeNodeAtIndex(0);
+//            return n;
+//        }
+//
         int getChildNodePosition(Node n){
             for(int i = 0; i < M; i++){
                 if (childrenNode[i].equals(n)){
@@ -139,6 +156,7 @@ public class BTree {
         public String toString() {
             return Arrays.toString(entries);
         }
+
 
     }
 
