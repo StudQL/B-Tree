@@ -137,6 +137,9 @@
         }
             leftNode.childrenNode[mid] = node.childrenNode[mid];
             leftNode.childrenNode[mid].parentNode = leftNode;
+	    
+	    leftNode.childrenNode[mid].rightSibling = null;
+            rightNode.childrenNode[0].leftSibling = null;
 
             node.childrenNode = new BTree.Node[bT.M];
             node.childrenNode[0] = leftNode;
