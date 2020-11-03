@@ -192,11 +192,16 @@
                 break;
         }
         parent.entries[index] = midEntry;
-		parent.childrenNode[index+1] = rightNode;
-		parent.used_slots++;
-		rightNode.parentNode = parent;
+	parent.childrenNode[index+1] = rightNode;
+	parent.used_slots++;
+	rightNode.parentNode = parent;
         rightNode.leftSibling = node;
+	rightNode.rightSibling = node.rightSibling;
         node.rightSibling = rightNode;
+	     
+	if(parent.childrenNode[index+2] != null)
+            parent.childrenNode[index+2].leftSibling = rightNode;
+	     
         if(entry.key>midEntry.key){
 			return rightNode;
 		}
