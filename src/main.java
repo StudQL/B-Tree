@@ -24,39 +24,45 @@ public class main {
         BTree bTree = test_insertion(5);
         String rel_path = graphviz_display(bTree.rootNode, null, null, "1. Build tree");
 
-        JFrame f = new JFrame("B Tree");
+        JFrame f = new JFrame("1. Build tree");
         ImageIcon i = new ImageIcon(rel_path);
-        JLabel l = new JLabel(i);
-        JPanel p = new JPanel();
-        p.add(l);
-        f.add(p);
         f.setSize(i.getIconWidth(), i.getIconHeight() + 50);
+        f.add(new JPanel().add(new JLabel(i)));
+        f.setLocationRelativeTo(null);
         f.show();
 
 
-        int ops_counter = 2;
+        int ops_counter = 1;
 
         while (true) {
             System.out.println("Insert or delete a node (example : 'delete 15', 'insert 45):\n");
             Scanner sc = new Scanner(System.in);
             String user_command = sc.nextLine();
             String[] user_command_array = user_command.strip().split("\\s+");
+            boolean valid_user_command = true;
+
             if (user_command_array.length == 2) {
                 int key = Integer.parseInt(user_command_array[1]);
                 if (user_command_array[0].equals("delete")) {
                     bTree.single_executioner.delete(new int[]{key});
                     rel_path = graphviz_display(bTree.rootNode, null, null, ops_counter + ". " + user_command.strip());
-                    i = new ImageIcon(rel_path);
-                    l.setIcon(i);
                     ops_counter++;
                 } else if (user_command_array[0].equals("insert")) {
                     bTree.single_executioner.insert(new BTree.Entry[]{bTree.new Entry(key, key)});
                     rel_path = graphviz_display(bTree.rootNode, null, null, ops_counter + ". " + user_command.strip());
-                    i = new ImageIcon(rel_path);
-                    l.setIcon(i);
                     ops_counter++;
                 } else {
                     System.out.println("error");
+                    valid_user_command = false;
+                }
+
+                if(valid_user_command){
+                    f = new JFrame(ops_counter + ". " + user_command.strip());
+                    i = new ImageIcon(rel_path);
+                    f.setSize(i.getIconWidth(), i.getIconHeight() + 50);
+                    f.add(new JPanel().add(new JLabel(i)));
+                    f.setLocationRelativeTo(null);
+                    f.show();
                 }
             }
         }
