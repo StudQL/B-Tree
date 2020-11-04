@@ -1,3 +1,9 @@
+import javax.swing.*;
+import java.security.cert.TrustAnchor;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
 class SingleExecutioner extends AbstractExecutioner {
 
     SingleExecutioner(BTree bTree) {
@@ -6,231 +12,468 @@ class SingleExecutioner extends AbstractExecutioner {
 
     @Override
     BTree.Entry[] get(int[] keys) {
-        return null;
+        Object[][] node_entry_pairs = get_node_entry_pairs(keys);
+        BTree.Entry[] output = new BTree.Entry[keys.length];
+        for (int i = 0; i < keys.length; i++)
+            output[i] = (BTree.Entry) node_entry_pairs[i][1];
+        return output;
+    }
+
+    private Object[][] get_node_entry_pairs(int[] keys) {
+        Object[][] output = new Object[keys.length][2];
+        for (int i = 0; i < keys.length; i++)
+            output[i] = single_get(keys[i]);
+        return output;
+    }
+
+    private Object[] single_get(int key) {
+        BTree.Node root = bT.rootNode;
+        while (!root.isLeaf) {
+            if (key > root.entries[root.used_slots - 1].key) {
+                root = root.childrenNode[root.used_slots];
+                continue;
+            } else {
+                for (int i = 0; i < root.used_slots; i++) {
+                    if (root.entries[i].key == key)
+                        return new Object[]{root, root.entries[i]};
+
+                    else if (root.entries[i].key > key) {
+                        root = root.childrenNode[i];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (root.getKeyIndex(key) != -1)
+            return new Object[]{root, root.entries[root.getKeyIndex(key)]};
+        else
+            return null;
     }
 
     @Override
     void insert(BTree.Entry[] entries) {
+        for (BTree.Entry entry : entries) {
+            try {
+                single_insert(entry);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
+    }
+
+    void single_insert(BTree.Entry entry) throws Exception {
+
+        if (entry == null) throw new IllegalArgumentException("entry argument is null");
+        //Root node without entry
+        if ((bT.rootNode.isRoot) && (bT.rootNode.used_slots == 0)) {
+            bT.rootNode.entries[0] = entry;
+            bT.rootNode.used_slots++;
+            return;
+        }
+        BTree.Node temp = bT.rootNode;
+        while (!temp.isLeaf) {
+            if (entry.key > temp.entries[temp.used_slots - 1].key) {
+                temp = temp.childrenNode[temp.used_slots];
+                continue;
+            }
+            for (int i = 0; i < temp.used_slots; i++)
+                if (entry.key == temp.entries[i].key) {
+                    temp.entries[i].value = entry.value;
+                    return;
+                } else if (entry.key < temp.entries[i].key) {
+                    temp = temp.childrenNode[i];
+                    break;
+                }
+        }
+
+        if (temp.used_slots == bT.max_keys)
+            temp = splitNode(temp, entry);
+        temp.addEntry(entry);
+
+    }
+
+
+    private BTree.Node splitRootNode(BTree.Node node, BTree.Entry entry) {
+
+        int mid = bT.max_keys / 2;
+        BTree.Node leftNode = bT.new Node(false, true);
+        BTree.Node rightNode = bT.new Node(false, true);
+        System.arraycopy(node.entries, 0, leftNode.entries, 0, mid);
+        leftNode.used_slots = mid;
+        System.arraycopy(node.entries, mid + 1, rightNode.entries, 0, mid - 1);
+        rightNode.used_slots = mid - 1;
+
+        BTree.Entry tmp = node.entries[mid];
+        node.entries = new BTree.Entry[bT.max_keys];
+        node.entries[0] = tmp;
+        node.used_slots = 1;
+
+        node.isLeaf = false;
+        node.childrenNode = new BTree.Node[bT.M];
+        node.childrenNode[0] = leftNode;
+        node.childrenNode[1] = rightNode;
+        leftNode.parentNode = node;
+        rightNode.parentNode = node;
+        leftNode.rightSibling = rightNode;
+        rightNode.leftSibling = leftNode;
+
+        if (entry.key > node.entries[0].key)
+            return rightNode;
+
+        return leftNode;
+    }
+
+    private BTree.Node splitParentNode(BTree.Node node, BTree.Entry entry) {
+
+        int mid = bT.max_keys / 2;
+        BTree.Node leftNode = bT.new Node(false, false);
+        BTree.Node rightNode = bT.new Node(false, false);
+        System.arraycopy(node.entries, 0, leftNode.entries, 0, mid);
+        leftNode.used_slots = mid;
+        System.arraycopy(node.entries, mid + 1, rightNode.entries, 0, mid - 1);
+        rightNode.used_slots = mid - 1;
+
+        BTree.Entry tmp = node.entries[mid];
+        node.entries = new BTree.Entry[bT.max_keys];
+        node.entries[0] = tmp;
+        node.used_slots = 1;
+
+        leftNode.childrenNode = new BTree.Node[bT.M];
+        rightNode.childrenNode = new BTree.Node[bT.M];
+
+        for (int i = 0; i < mid; i++) {
+            leftNode.childrenNode[i] = node.childrenNode[i];
+            leftNode.childrenNode[i].parentNode = leftNode;
+            rightNode.childrenNode[i] = node.childrenNode[i + mid + 1];
+            rightNode.childrenNode[i].parentNode = rightNode;
+        }
+        leftNode.childrenNode[mid] = node.childrenNode[mid];
+        leftNode.childrenNode[mid].parentNode = leftNode;
+
+        leftNode.childrenNode[mid].rightSibling = null;
+        rightNode.childrenNode[0].leftSibling = null;
+
+        node.childrenNode = new BTree.Node[bT.M];
+        node.childrenNode[0] = leftNode;
+        node.childrenNode[1] = rightNode;
+
+        leftNode.parentNode = node;
+        rightNode.parentNode = node;
+        leftNode.rightSibling = rightNode;
+        rightNode.leftSibling = leftNode;
+
+        if (entry.key > node.entries[0].key)
+            return rightNode;
+
+        return leftNode;
+    }
+
+
+    public BTree.Node splitNode(BTree.Node node, BTree.Entry entry) {
+
+        int mid = bT.max_keys / 2;
+        BTree.Node parent = node.parentNode;
+
+        // root node
+        if (node.isRoot) return splitRootNode(node, entry);
+
+        // parent node full of entries so we have to split it before
+        if (parent.used_slots == bT.max_keys)
+            parent = splitParentNode(parent, node.entries[mid]);
+
+        //split of a leaf node with parent not full
+        BTree.Node rightNode = bT.new Node(false, true);
+        System.arraycopy(node.entries, mid + 1, rightNode.entries, 0, mid - 1);
+        rightNode.used_slots = mid - 1;
+        node.used_slots = mid;
+        int index = parent.used_slots;
+
+        BTree.Entry midEntry = node.entries[mid];
+
+        for (int i = mid; i < 2 * mid; i++)
+            node.entries[i] = null;
+
+        for (int i = parent.used_slots - 1; i > -1; i--) {
+            if (midEntry.key < parent.entries[i].key) {
+                parent.entries[i + 1] = parent.entries[i];
+                parent.childrenNode[i + 2] = parent.childrenNode[i + 1];
+                index = i;
+            } else
+                break;
+        }
+        parent.entries[index] = midEntry;
+        parent.childrenNode[index + 1] = rightNode;
+        parent.used_slots++;
+        rightNode.parentNode = parent;
+        rightNode.leftSibling = node;
+        rightNode.rightSibling = node.rightSibling;
+        node.rightSibling = rightNode;
+
+        if (parent.childrenNode[index + 2] != null)
+            parent.childrenNode[index + 2].leftSibling = rightNode;
+
+        if (entry.key > midEntry.key) {
+            return rightNode;
+        }
+        return node;
     }
 
     @Override
     void delete(int[] keys) throws Exception {
-        BTree.Entry[] entries = this.get(keys);
-        for (BTree.Entry e : entries) {
-            single_delete(e);
+        Object[][] node_entry_pairs = this.get_node_entry_pairs(keys);
+        for (Object[] node_entry : node_entry_pairs) {
+            single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
         }
     }
 
-    private void single_delete(BTree.Entry e) throws Exception {
-        BTree.Node e_node = e.selfNode;
+    private void single_delete(BTree.Node e_node, BTree.Entry e) throws Exception {
+        int index = e_node.getKeyIndex(e.key);
+
         if (e_node.isLeaf) {
 
             // DELETE KEY
-            int index = e_node.getKeyIndex(e.key);
             e_node.entries[index] = null;
-            e_node.used_slots--;
 
             // FIX TREE IF NODE IS IMBALANCED
-            if (e_node.used_slots < bT.min_keys) {
+            if (e_node.used_slots - 1 < bT.min_keys) {
                 rebalance_tree(e_node, index);
+            } else {
+                shift_entries_left(e_node);
+                e_node.used_slots--;
             }
-            else{
-                shift_entries_left(e_node,index);
+        } else {
+            BTree.Node inorder = getInorderPredecessorNode(e_node, index);
+            BTree.Entry backup = e_node.entries[index];
+            if (inorder.used_slots > bT.min_keys) {
+                e_node.entries[index] = inorder.entries[inorder.used_slots - 1];
+                inorder.entries[inorder.used_slots-1] = backup;
+            } else {
+                inorder = getInorderSuccessorNode(e_node, index);
+                e_node.entries[index] = inorder.entries[0];
+                inorder.entries[0] = backup;
             }
-        }
-        else{
-            // GET INORDER PREDECESSOR
-            // IF INORDER PREDECESSOR NODE HAS MIN KEYS, GET INORDER SUCCESSOR
-            // REPLACE ENTRY WITH INORDER
-            // DELETE INORDER
+            single_delete(inorder, backup);
         }
 
     }
 
     private void rebalance_tree(BTree.Node node, int entryIndex) throws Exception {
-        int node_pos = node.parentNode.getChildNodePosition(node);
-        if (node.leftSibling != null && node.leftSibling.used_slots > bT.min_keys) {
-            take_entry_from_left(node, node_pos, entryIndex);
-        } else if (node.rightSibling != null && node.rightSibling.used_slots > bT.min_keys) {
-            take_entry_from_right(node, node_pos, entryIndex);
-        } else {
-            merge_with_left(node, node_pos);
-            if(node.parentNode.used_slots < bT.min_keys){
-                rebalance_tree(node.parentNode, );
+        if (!node.isRoot) {
+            int node_pos = node.parentNode.getChildNodePosition(node);
+            if (node.leftSibling != null && node.leftSibling.used_slots > bT.min_keys) {
+                take_entry_from_left(node, node_pos);
+            } else if (node.rightSibling != null && node.rightSibling.used_slots > bT.min_keys) {
+                take_entry_from_right(node, node_pos);
+            } else {
+                int parent_entry_pos = node_pos;
+                if (node.leftSibling != null) {
+                    merge_with_left(node, node_pos, entryIndex);
+                    parent_entry_pos = node_pos - 1;
+                } else {
+                    merge_with_right(node, node_pos, entryIndex);
+                }
+                if (node.parentNode != null) {
+                    if (node.parentNode.used_slots - 1 < bT.min_keys && !node.parentNode.isRoot) {
+                        rebalance_tree(node.parentNode, parent_entry_pos);
+                    } else {
+                        shift_entries_left(node.parentNode);
+                        node.parentNode.used_slots--;
+                    }
+                }
             }
         }
     }
 
-    private void take_entry_from_left(BTree.Node node, int node_pos, int entryIndex) {
+    private void take_entry_from_left(BTree.Node node, int node_pos) {
 
         // store replacement entries
-        BTree.Entry new_node_entry = node.parentNode.entries[node_pos-1];
-        BTree.Entry new_parent_entry = node.leftSibling.entries[node.leftSibling.used_slots-1];
+        BTree.Entry new_node_entry = node.parentNode.entries[node_pos - 1];
+        BTree.Entry new_parent_entry = node.leftSibling.entries[node.leftSibling.used_slots - 1];
 
         // remove entry from sibling, store rightChildNode, remove rightChildNode
-        node.leftSibling.entries[node.leftSibling.used_slots-1] = null;
-        BTree.Node rightChild = node.leftSibling.childrenNode[node.leftSibling.used_slots];
-        node.leftSibling.childrenNode[node.leftSibling.used_slots] = null;
+        node.leftSibling.entries[node.leftSibling.used_slots - 1] = null;
         node.leftSibling.used_slots--;
 
         // set new entries and child node
-        node.parentNode.entries[node_pos-1] = new_parent_entry;
-        shift_entries_right(node, entryIndex);
+        node.parentNode.entries[node_pos - 1] = new_parent_entry;
+        shift_entries_right(node);
         node.entries[0] = new_node_entry;
-        shift_children_right(node, node.used_slots+1);
-        node.childrenNode[0] = rightChild;
-        rightChild.parentNode = node;
-        rightChild.rightSibling = node.childrenNode[1];
+
+        if (!node.leftSibling.isLeaf) {
+            BTree.Node rightChild = node.leftSibling.childrenNode[node.leftSibling.used_slots];
+            node.leftSibling.childrenNode[node.leftSibling.used_slots] = null;
+            shift_children_right(node);
+            node.childrenNode[0] = rightChild;
+            rightChild.parentNode = node;
+            rightChild.rightSibling = node.childrenNode[1];
+            rightChild.leftSibling = null;
+        }
 
     }
 
-    private void take_entry_from_right(BTree.Node node, int node_pos, int entryIndex) {
+    private void take_entry_from_right(BTree.Node node, int node_pos) {
 
         // store replacement entries
         BTree.Entry new_node_entry = node.parentNode.entries[node_pos];
         BTree.Entry new_parent_entry = node.rightSibling.entries[0];
 
-        // remove entry from sibling, store rightChildNode, remove rightChildNode
+        // remove entry from sibling, store leftChildNode, remove leftChildNode
         node.rightSibling.entries[0] = null;
-        BTree.Node leftChild = node.rightSibling.childrenNode[0];
-        node.rightSibling.childrenNode[0] = null;
+        shift_entries_left(node.rightSibling);
         node.rightSibling.used_slots--;
 
         // set new entries and child node
         node.parentNode.entries[node_pos] = new_parent_entry;
-        shift_entries_left(node, entryIndex);
-        node.entries[node.used_slots] = new_node_entry;
-        node.childrenNode[node.used_slots+1] = leftChild;
-        leftChild.parentNode = node;
-        leftChild.leftSibling = node.childrenNode[node.used_slots];
+        shift_entries_left(node);
+        node.entries[node.used_slots - 1] = new_node_entry;
+
+        if (!node.rightSibling.isLeaf) {
+            BTree.Node leftChild = node.rightSibling.childrenNode[0];
+            node.rightSibling.childrenNode[0] = null;
+            shift_children_left(node.rightSibling);
+            node.childrenNode[node.used_slots + 1] = leftChild;
+            leftChild.parentNode = node;
+            leftChild.leftSibling = node.childrenNode[node.used_slots];
+            leftChild.rightSibling = null;
+        }
+
     }
 
-    private void merge_with_left(BTree.Node node, int node_pos) {
+    private void merge_with_left(BTree.Node node, int node_pos, int entry_index) throws Exception {
 
-    }
+        BTree.Entry new_sibling_entry = node.parentNode.entries[node_pos - 1];
+        node.parentNode.entries[node_pos - 1] = null;
+        node.parentNode.childrenNode[node_pos] = null;
+        shift_children_left(node.parentNode);
 
-    private void remove_entry_at_index(int index, BTree.Node e_node) {
-        e_node.entries[index] = null;
-        e_node.used_slots--;
-        for (int j = index + 1; j <= e_node.used_slots; j++) {
-            e_node.entries[j - 1] = e_node.entries[j];
-            if (j == e_node.used_slots) {
-                e_node.entries[j] = null;
+        // merge
+        node.leftSibling.entries[node.leftSibling.used_slots] = new_sibling_entry;
+        node.leftSibling.used_slots++;
+
+        for (int i = 0; i < node.used_slots; i++) {
+            if (!node.isLeaf) {
+                node.leftSibling.childrenNode[node.leftSibling.used_slots + i] = node.childrenNode[i];
+                node.leftSibling.childrenNode[node.leftSibling.used_slots + i - 1].rightSibling = node.childrenNode[i];
+                node.childrenNode[i].leftSibling = node.leftSibling.childrenNode[node.leftSibling.used_slots + i - 1];
+                node.childrenNode[i].parentNode = node.leftSibling;
+            }
+            if (i == entry_index) {
+                continue;
+            } else if (i < entry_index) {
+                node.leftSibling.entries[node.leftSibling.used_slots + i] = node.entries[i];
+            } else {
+                node.leftSibling.entries[node.leftSibling.used_slots + i - 1] = node.entries[i];
             }
         }
-    }
+        node.leftSibling.used_slots += node.used_slots - 1;
 
-    private void remove_entry(int key, BTree.Node e_node) throws Exception {
-        int i = e_node.getKeyIndex(key);
-        if (i == -1) {
-            throw new Exception("Key not found");
+        node.leftSibling.rightSibling = node.rightSibling;
+        if (node.parentNode.isRoot && node.parentNode.used_slots - 1 == 0) {
+            node.leftSibling.isRoot = true;
+            bT.rootNode = node.leftSibling;
+            node.leftSibling.parentNode = null;
         }
-        remove_entry_at_index(i, e_node);
     }
 
-    private void remove_entry(BTree.Entry e, BTree.Node e_node) throws Exception {
-        remove_entry(e.key,e_node);
-    }
+    private void merge_with_right(BTree.Node node, int node_pos, int entry_index) {
+        BTree.Entry new_sibling_entry = node.parentNode.entries[node_pos];
+        node.parentNode.entries[node_pos] = null;
+        node.parentNode.childrenNode[node_pos + 1] = null;
+        shift_children_left(node.parentNode);
 
-    private void shift_entries_right(BTree.Node node, int index){
-        for (int j = index - 1; j >= 0; j--) {
-            node.entries[j + 1] = node.entries[j];
+        // merge
+        shift_entries_left(node);
+        node.entries[node.used_slots - 1] = new_sibling_entry;
+
+        for (int i = 0; i < node.rightSibling.used_slots; i++) {
+            node.entries[node.used_slots] = node.rightSibling.entries[i];
+
+            if (!node.isLeaf) {
+                node.childrenNode[node.used_slots] = node.rightSibling.childrenNode[i];
+                node.childrenNode[node.used_slots - 1].rightSibling = node.rightSibling.childrenNode[i];
+                node.rightSibling.childrenNode[i].leftSibling = node.childrenNode[node.used_slots - 1];
+                node.rightSibling.childrenNode[i].parentNode = node;
+            }
+            node.used_slots++;
         }
+        node.childrenNode[node.used_slots] = node.rightSibling.childrenNode[node.rightSibling.used_slots];
+
+        node.rightSibling = node.rightSibling.rightSibling;
+        if (node.parentNode.isRoot && node.parentNode.used_slots - 1 == 0) {
+            node.isRoot = true;
+            bT.rootNode = node;
+            node.parentNode = null;
+        }
+    }
+
+    private void shift_entries_right(BTree.Node node) {
+        BTree.Entry previous = node.entries[0];
         node.entries[0] = null;
+        for (int j = 0; j < node.used_slots; j++) {
+            if (previous == null) {
+                break;
+            }
+            BTree.Entry backup = node.entries[j + 1];
+            node.entries[j + 1] = previous;
+            previous = backup;
+        }
     }
 
-    private void shift_entries_left(BTree.Node node, int index){
-        for (int j = index + 1; j <= node.used_slots; j++) {
-            node.entries[j - 1] = node.entries[j];
+    private void shift_entries_left(BTree.Node node) {
+        BTree.Entry previous = node.entries[node.used_slots - 1];
+        node.entries[node.used_slots - 1] = null;
+        for (int j = node.used_slots - 1; j > 0; j--) {
+            if (previous == null) {
+                break;
+            }
+            BTree.Entry backup = node.entries[j - 1];
+            node.entries[j - 1] = previous;
+            previous = backup;
         }
-        node.entries[node.used_slots] = null;
     }
 
-    private void shift_children_right(BTree.Node node, int index){
-        for (int j = index - 1; j >= 0; j--) {
-            node.childrenNode[j + 1] = node.childrenNode[j];
-        }
+    private void shift_children_right(BTree.Node node) {
+        BTree.Node previous = node.childrenNode[0];
         node.childrenNode[0] = null;
-    }
-
-    private void shift_children_left(BTree.Node node, int index){
-        for (int j = index + 1; j <= node.used_slots; j++) {
-            node.childrenNode[j - 1] = node.childrenNode[j];
+        for (int j = 0; j < node.used_slots + 1; j++) {
+            if (previous == null) {
+                break;
+            }
+            BTree.Node backup = node.childrenNode[j + 1];
+            node.childrenNode[j + 1] = previous;
+            previous = backup;
         }
-        node.childrenNode[node.used_slots] = null;
     }
 
 
-//    private void single_delete(BTree.Entry e) throws Exception {
-//        BTree.Node e_node = e.selfNode;
-//        if(!e_node.isLeaf){
-//            BTree.Node leftChild = e.getLeftChild();
-//            BTree.Node rightChild = e.getRightChild();
-//            if(leftChild.used_slots > bT.min_keys){
-//                BTree.Entry in_pre = e.getInorderPredecessor();
-//
-//
-//            }
-//            else if(rightChild.used_slots > bT.min_keys){
-//                BTree.Entry in_suc = e.getInorderSuccessor();
-//
-//            }
-//            else{
-//
-//            }
-//        }
-//    }
+    private void shift_children_left(BTree.Node node) {
+        BTree.Node previous = node.childrenNode[node.used_slots];
+        node.childrenNode[node.used_slots] = null;
+        for (int j = node.used_slots; j > 0; j--) {
+            if (previous == null) {
+                break;
+            }
+            BTree.Node backup = node.childrenNode[j - 1];
+            node.childrenNode[j - 1] = previous;
+            previous = backup;
+        }
+    }
 
-//    private void single_delete(BTree.Entry e) throws Exception {
-//        BTree.Node e_node = e.selfNode;
-//        if(e_node.isLeaf){
-//            e_node.removeEntry(e);
-//            if(e_node.used_slots < bT.min_keys){
-//                int e_pos = e_node.parentNode.getChildNodePosition(e_node);
-//                if(e_node.leftSibling != null && e_node.leftSibling.used_slots > bT.min_keys){
-//                    e_node.addEntryAtIndex(e_node.parentNode.entries[e_pos-1], 0);
-//                    e_node.parentNode.addEntryAtIndex(e_node.leftSibling.pollLastEntry(), e_pos-1);
-//                }
-//                else if (e_node.rightSibling != null && e_node.rightSibling.used_slots > bT.min_keys){
-//                    e_node.addEntryAtIndex(e_node.parentNode.entries[e_pos], e_node.used_slots);
-//                    e_node.parentNode.addEntryAtIndex(e_node.rightSibling.pollFirstEntry(), e_pos);
-//                }
-//                else{
-//                    if(e_node.leftSibling != null){
-//                        e_node.leftSibling.addEntryAtIndex(e_node.parentNode.entries[e_pos-1], e_node.leftSibling.used_slots);
-//                        for(int i = 0; i < e_node.used_slots; i++){
-//                            e_node.leftSibling.addEntryAtIndex(e_node.entries[i], e_node.leftSibling.used_slots);
-//                        }
-//                        single_delete(e_node.parentNode.entries[e_pos-1]);
-//                        removeNode(e_node, e_pos);
-//                    }
-//                    else if(e_node.rightSibling != null){
-//                        e_node.rightSibling.addEntryAtIndex(e_node.parentNode.entries[e_pos], 0);
-//                        for(int i = 0; i < e_node.used_slots; i++){
-//                            e_node.rightSibling.addEntryAtIndex(e_node.entries[i], i);
-//                        }
-//                        single_delete(e_node.parentNode.entries[e_pos]);
-//                        removeNode(e_node, e_pos);
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//    private void merge_nodes(BTree.Node leftNode, BTree.Node rightNode){
-//
-//    }
-//
-//     private void removeNode(BTree.Node node, int position){
-//         node.parentNode.childrenNode[position] = null;
-//         node.leftSibling.rightSibling = node.rightSibling;
-//         node.rightSibling.leftSibling = node.leftSibling;
-//         for (int j = position + 1; j < bT.M; j++) {
-//             node.parentNode.childrenNode[j - 1] = node.parentNode.childrenNode[j];
-//             if(node.parentNode.childrenNode[j] == null) {
-//                 break;
-//             }
-//         }
-//     }
+    private BTree.Node getInorderPredecessorNode(BTree.Node e_node, int entry_index) {
+        BTree.Node current = e_node.childrenNode[entry_index];
+        while (!current.isLeaf) {
+            current = current.childrenNode[current.used_slots];
+        }
+        return current;
+    }
+
+    private BTree.Node getInorderSuccessorNode(BTree.Node e_node, int entry_index) {
+        BTree.Node current = e_node.childrenNode[entry_index + 1];
+        while (!current.isLeaf) {
+            current = current.childrenNode[0];
+        }
+        return current;
+    }
 }
