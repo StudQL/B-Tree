@@ -240,6 +240,7 @@ class SingleExecutioner extends AbstractExecutioner {
             if (e_node.used_slots - 1 < bT.min_keys) {
                 rebalance_tree(e_node, index);
             } else {
+                // LOCK NOT REQUIRED
                 shift_entries_left(e_node);
                 e_node.used_slots--;
             }
@@ -262,8 +263,11 @@ class SingleExecutioner extends AbstractExecutioner {
     private void rebalance_tree(BTree.Node node, int entryIndex) throws Exception {
         if (!node.isRoot) {
             int node_pos = node.parentNode.getChildNodePosition(node);
+
+            // LOCK NODE AND SIBLINGS
             if (node.leftSibling != null && node.leftSibling.used_slots > bT.min_keys) {
                 take_entry_from_left(node, node_pos);
+            // LOCK NODE AND SIBLINGS
             } else if (node.rightSibling != null && node.rightSibling.used_slots > bT.min_keys) {
                 take_entry_from_right(node, node_pos);
             } else {
