@@ -30,7 +30,7 @@ public class BTree {
         Node leftSibling = null;
         Node rightSibling = null;
         Node parentNode = null;
-        Node[] childrenNode = new Node[M];
+        Node[] childrenNode = null;
         boolean isRoot;
         boolean isLeaf;
         int used_slots = 0; // UPDATE A CHAQUE INSERTION ET DELETION D'UN ELEMENT

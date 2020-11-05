@@ -68,18 +68,6 @@ public class main {
         }
     }
 
-    public BTree read_toy_example() throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader("../toy-tree.txt"));
-        String line = br.readLine();
-        int M = Integer.parseInt(line);
-        BTree bT = new BTree(M);
-
-        while ((line = br.readLine()) != null) {
-            // TODO once we have insert function
-        }
-        return bT;
-    }
-
     public static BTree test_insertion(int tree_order) throws Exception {
 
         BufferedReader br = new BufferedReader(new FileReader("data.txt"));
@@ -111,39 +99,6 @@ public class main {
         }
         bT.single_executioner.insert(entries_array);
         return bT;
-    }
-
-    public static BTree.Entry[] test_get(BTree bt) throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader("data.txt"));
-        String line[] = br.readLine().split("\\s+");
-
-        SingleExecutioner sExecutioner = new SingleExecutioner(bt);
-
-        //create an array of keys
-        int keys[] = new int[line.length];
-        for (int i = 0; i < line.length; i++)
-            keys[i] = Integer.parseInt(line[i]);
-
-        //get entries
-        BTree.Entry entries[] = sExecutioner.get(keys);
-
-        return entries;
-
-    }
-
-    public static void display(BTree.Node root) {
-        if (root == null)
-            return;
-
-        System.out.println(root);
-
-        if (root.isLeaf)
-            return;
-
-        for (int i = 0; i < root.used_slots + 1; i++)
-            if (root.childrenNode[i] != null)
-                display(root.childrenNode[i]);
-
     }
 
     public static String graphviz_display(BTree.Node current, MutableNode graphviz_current, List<MutableNode> nodes, String tree_name) throws IOException {
