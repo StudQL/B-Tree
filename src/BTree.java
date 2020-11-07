@@ -11,9 +11,7 @@ public class BTree {
     final int max_keys;
     final int min_children;
 
-    enum executionType {single_thread, multi_thread, spark}
-
-    ;
+    enum executionType {single_thread, multi_thread, spark};
     Node rootNode;
     AbstractExecutioner single_executioner = new SingleExecutioner(this);
     AbstractExecutioner multi_executioner = new MultiExecutioner(this);
@@ -21,7 +19,7 @@ public class BTree {
 
     public BTree(int M) {
         this.M = M;
-        this.min_children = (int) Math.ceil(M / 2);
+        this.min_children = (int) Math.ceil(M / 2.0);
         this.max_keys = M - 1;
         this.min_keys = this.min_children - 1;
         this.rootNode = new Node(true, true);
@@ -43,30 +41,46 @@ public class BTree {
             this.isLeaf = isLeaf;
         }
 
+        String getEntriesString(){
+            String[] s_array = new String[used_slots];
+            for (int i = 0; i< used_slots; i++){
+                s_array[i] = Integer.toString(entries[i].key);
+            }
+            return String.join(" | ", s_array);
+        }
+
         int getKeyIndex(int key) {
-            int beg = 0, end = max_keys - 1;
-            while (beg <= end) {
-                int e = beg + (end - beg) / 2;
-                if (this.entries[e].key == key)
-                    return e;
-                if (this.entries[e].key < key)
-                    beg = e + 1;
-                else
-                    end = e - 1;
+            if(this.used_slots >= min_keys){
+                int beg = 0, end = max_keys - 1;
+                while (beg <= end) {
+                    int e = beg + (end - beg) / 2;
+                    if (this.entries[e].key == key)
+                        return e;
+                    if (this.entries[e].key < key)
+                        beg = e + 1;
+                    else
+                        end = e - 1;
+                }
+            }else{
+                for (int i = 0; i < max_keys; i++){
+                    if(this.entries[i].key == key){
+                        return i;
+                    }
+                }
             }
             return -1;
         }
 
-        int getKeyIndex(Entry entry) {
-            return getKeyIndex(entry.key);
-        }
-
         void addEntryAtIndex(Entry entry, int index) {
+            if(this.entries[index] != null && this.entries[index].key == entry.key){
+                this.entries[index].value = entry.value;
+                return;
+            }
+
             for (int j = this.used_slots - 1; index <= j; j--) {
                 this.entries[j + 1] = this.entries[j];
             }
             this.entries[index] = entry;
-            entry.selfNode = this;
             this.used_slots++;
         }
 
@@ -88,40 +102,13 @@ public class BTree {
             addEntry(entry);
         }
 
-        void removeEntry(int key) throws Exception {
-            int i = getKeyIndex(key);
-            if (i == -1) {
-                throw new Exception("Key not found");
-            }
-            this.entries[i] = null;
-            this.used_slots--;
-            for (int j = i + 1; j <= this.used_slots; j++) {
-                this.entries[j - 1] = this.entries[j];
-                if (j == this.used_slots) {
-                    this.entries[j] = null;
+        int getChildNodePosition(Node n){
+            for(int i = 0; i < M; i++){
+                if (childrenNode[i].equals(n)){
+                    return i;
                 }
             }
-        }
-
-        void removeEntry(Entry entry) throws Exception {
-            removeEntry(entry.key);
-        }
-
-        Entry pollLastEntry() throws Exception {
-            for (int i = max_keys - 1; i >= min_keys; i--) {
-                if (this.entries[i] != null) {
-                    Entry e = this.entries[i];
-                    this.entries[i] = null;
-                    return e;
-                }
-            }
-            return null;
-        }
-
-        Entry pollFirstEntry() throws Exception {
-            Entry e = this.entries[0];
-            removeEntry(e);
-            return e;
+            return -1;
         }
 
         @Override
@@ -129,12 +116,12 @@ public class BTree {
             return Arrays.toString(entries);
         }
 
+
     }
 
     class Entry {
         int key;
         Object value;
-        Node selfNode = null;
 
         Entry(int key, Object value) {
             this.key = key;
@@ -148,6 +135,24 @@ public class BTree {
                     ", value=" + value +
                     '}';
         }
+
+//        Node getLeftChild(){
+//            if (selfNode.isLeaf){
+//                return null;
+//            }
+//            int index_in_node = selfNode.getKeyIndex(key);
+//            return selfNode.childrenNode[index_in_node];
+//        }
+//
+//        Node getRightChild(){
+//            if (selfNode.isLeaf){
+//                return null;
+//            }
+//            int index_in_node = selfNode.getKeyIndex(key);
+//            return selfNode.childrenNode[index_in_node+1];
+//        }
+//
+
     }
 
 
@@ -174,6 +179,46 @@ public class BTree {
             default:
                 return null;
         }
+    }
+
+    public boolean isValid(BTree.Node node)
+    {
+        if(node==null)
+            return true;
+
+        //System.out.println(node+"\n");
+
+        if(node.isLeaf){
+
+            if((!node.isRoot)&&(node.used_slots< min_keys)) return false;
+
+            for (int i = 1; i < node.used_slots; i++)
+                if (node.entries[i].key < node.entries[i-1].key) return false;
+            return true;
+        }
+
+        boolean testFirstNode = false, testLastNode = false, midleNodes = false;
+
+        //test the first node's children
+        testFirstNode = ((node.childrenNode[0].entries[node.childrenNode[0].used_slots-1].key < node.entries[0].key)&&(isValid(node.childrenNode[0])));
+
+        if(!testFirstNode) return false;
+
+        for(int i=1; i<node.used_slots; i++){
+
+            if (node.entries[i].key < node.entries[i-1].key)
+                return false;
+
+            midleNodes = ((node.entries[i].key > node.childrenNode[i].entries[node.childrenNode[i].used_slots-1].key) && isValid(node.childrenNode[i]));
+
+            if(!midleNodes) return false;
+        }
+        //test the last node's children
+        testLastNode = ((node.childrenNode[node.used_slots].entries[0].key > node.entries[node.used_slots-1].key)&&(isValid(node.childrenNode[node.used_slots])));
+
+        if(node.used_slots > 2)
+            return ((testFirstNode)&&(midleNodes)&&(testLastNode));
+        return ((testFirstNode)&&(testLastNode));
     }
 
 }
