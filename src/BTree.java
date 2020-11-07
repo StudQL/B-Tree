@@ -3,6 +3,8 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class BTree {
 
@@ -34,6 +36,7 @@ public class BTree {
         boolean isRoot;
         boolean isLeaf;
         int used_slots = 0; // UPDATE A CHAQUE INSERTION ET DELETION D'UN ELEMENT
+        ReadWriteLock lock = new ReentrantReadWriteLock();
 
         Node(boolean isRoot, boolean isLeaf) {
             this.entries = new Entry[max_keys];
@@ -56,7 +59,7 @@ public class BTree {
                     int e = beg + (end - beg) / 2;
                     if (this.entries[e].key == key)
                         return e;
-                    if (this.entries[e].key < key)
+                    else if (this.entries[e].key < key)
                         beg = e + 1;
                     else
                         end = e - 1;
