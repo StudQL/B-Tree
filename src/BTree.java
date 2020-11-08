@@ -1,21 +1,18 @@
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class BTree {
+public class BTree implements Serializable {
 
     final int M;
     final int min_keys;
     final int max_keys;
     final int min_children;
-
-    enum executionType {single_thread, multi_thread, spark};
     Node rootNode;
+
+    ;
     AbstractExecutioner single_executioner = new SingleExecutioner(this);
     AbstractExecutioner multi_executioner = new MultiExecutioner(this);
-    AbstractExecutioner spark_executioner = new SparkExecutioner(this);
 
     public BTree(int M) {
         this.M = M;
@@ -25,7 +22,39 @@ public class BTree {
         this.rootNode = new Node(true, true);
     }
 
-    class Node {
+    public void insert(Entry[] entries, executionType execution) {
+        this.get_executioner(execution).insert(entries);
+    }
+
+    public Entry[] get(int[] keys, executionType execution) {
+        return this.get_executioner(execution).get(keys);
+    }
+
+    public void delete(int[] keys, executionType execution) throws Exception {
+        this.get_executioner(execution).delete(keys);
+    }
+
+    private AbstractExecutioner get_executioner(executionType execution) {
+        switch (execution) {
+            case single_thread:
+                return single_executioner;
+            case multi_thread:
+                return multi_executioner;
+            default:
+                return null;
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "BTree{" +
+                "rootNode=" + rootNode +
+                '}';
+    }
+
+    enum executionType {single_thread, multi_thread, spark}
+
+    class Node implements Serializable {
         Entry[] entries;
         Node leftSibling = null;
         Node rightSibling = null;
@@ -34,6 +63,7 @@ public class BTree {
         boolean isRoot;
         boolean isLeaf;
         int used_slots = 0; // UPDATE A CHAQUE INSERTION ET DELETION D'UN ELEMENT
+        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
         Node(boolean isRoot, boolean isLeaf) {
             this.entries = new Entry[max_keys];
@@ -41,29 +71,30 @@ public class BTree {
             this.isLeaf = isLeaf;
         }
 
-        String getEntriesString(){
+        String getEntriesString() {
             String[] s_array = new String[used_slots];
-            for (int i = 0; i< used_slots; i++){
+            for (int i = 0; i < used_slots; i++) {
                 s_array[i] = Integer.toString(entries[i].key);
             }
             return String.join(" | ", s_array);
         }
 
         int getKeyIndex(int key) {
-            if(this.used_slots >= min_keys){
-                int beg = 0, end = max_keys - 1;
-                while (beg <= end) {
-                    int e = beg + (end - beg) / 2;
-                    if (this.entries[e].key == key)
-                        return e;
-                    if (this.entries[e].key < key)
-                        beg = e + 1;
+            if (this.used_slots >= min_keys) {
+                int low = 0;
+                int high = max_keys - 1;
+                while (low <= high) {
+                    int mid = low + ((high - low) / 2);
+                    if (this.entries[mid] == null ||this.entries[mid].key > key) {
+                        high = mid - 1;
+                    } else if (this.entries[mid].key < key)
+                        low = mid + 1;
                     else
-                        end = e - 1;
+                        return mid;
                 }
-            }else{
-                for (int i = 0; i < max_keys; i++){
-                    if(this.entries[i].key == key){
+            } else {
+                for (int i = 0; i < min_keys; i++) {
+                    if (this.entries[i] != null && this.entries[i].key == key) {
                         return i;
                     }
                 }
@@ -72,7 +103,7 @@ public class BTree {
         }
 
         void addEntryAtIndex(Entry entry, int index) {
-            if(this.entries[index] != null && this.entries[index].key == entry.key){
+            if (this.entries[index] != null && this.entries[index].key == entry.key) {
                 this.entries[index].value = entry.value;
                 return;
             }
@@ -97,14 +128,9 @@ public class BTree {
             addEntryAtIndex(entry, i);
         }
 
-        void addEntry(int key, Object value) throws Exception {
-            Entry entry = new Entry(key, value);
-            addEntry(entry);
-        }
-
-        int getChildNodePosition(Node n){
-            for(int i = 0; i < M; i++){
-                if (childrenNode[i].equals(n)){
+        int getChildNodePosition(Node n) {
+            for (int i = 0; i < M; i++) {
+                if (childrenNode[i].equals(n)) {
                     return i;
                 }
             }
@@ -119,11 +145,11 @@ public class BTree {
 
     }
 
-    class Entry {
+    class Entry<T>implements Serializable {
         int key;
-        Object value;
+        T value;
 
-        Entry(int key, Object value) {
+        Entry(int key, T value) {
             this.key = key;
             this.value = value;
         }
@@ -136,49 +162,5 @@ public class BTree {
                     '}';
         }
 
-//        Node getLeftChild(){
-//            if (selfNode.isLeaf){
-//                return null;
-//            }
-//            int index_in_node = selfNode.getKeyIndex(key);
-//            return selfNode.childrenNode[index_in_node];
-//        }
-//
-//        Node getRightChild(){
-//            if (selfNode.isLeaf){
-//                return null;
-//            }
-//            int index_in_node = selfNode.getKeyIndex(key);
-//            return selfNode.childrenNode[index_in_node+1];
-//        }
-//
-
     }
-
-
-    public void insert(Entry[] entries, executionType execution) {
-        this.get_executioner(execution).insert(entries);
-    }
-
-    public Entry[] get(int[] keys, executionType execution) {
-        return this.get_executioner(execution).get(keys);
-    }
-
-    public void delete(int[] keys, executionType execution) throws Exception {
-        this.get_executioner(execution).delete(keys);
-    }
-
-    private AbstractExecutioner get_executioner(executionType execution) {
-        switch (execution) {
-            case single_thread:
-                return single_executioner;
-            case multi_thread:
-                return multi_executioner;
-            case spark:
-                return spark_executioner;
-            default:
-                return null;
-        }
-    }
-
 }
