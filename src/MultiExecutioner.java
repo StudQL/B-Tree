@@ -12,9 +12,16 @@ class MultiExecutioner extends AbstractExecutioner {
     }
 
      public ExecutorService initialize_executor(){
-         ExecutorService executor = Executors.newCachedThreadPool();
+         int nbProcs = Runtime.getRuntime().availableProcessors();
+         System.out.println("Nb of available Threads :" + nbProcs);
+         ExecutorService executor = Executors.newFixedThreadPool(nbProcs);
          return executor;
      }
+
+     public ExecutorService initialize_executor_single(){
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        return executor;
+    }
 
      public void stop_executor(ExecutorService executor){
          try {
@@ -44,13 +51,13 @@ class MultiExecutioner extends AbstractExecutioner {
          return futures;
      }
 
-    public Callable<String> search_task(int key, int id){
+     public Callable<String> search_task(int[] keys, int id){
          Callable<String> task = () -> {
              try {
-                 Object[] object = single_get(key);
+                 BTree.Entry[] entries = get(keys);
                  String text = "";
-                 if(object != null) {
-                     text = "search task success n°" + id + " | " +object[1];
+                 if(entries != null) {
+                     text = "search task success n°" + id ;
                  }
                  else{
                      text = "search task finished but unsuccessful n°" + id;
@@ -136,7 +143,6 @@ class MultiExecutioner extends AbstractExecutioner {
                 }
             }
         }
-
         if (root.getKeyIndex(key) != -1) {
             root.lock.readLock().unlock();
             return new Object[]{root, root.entries[root.getKeyIndex(key)]};

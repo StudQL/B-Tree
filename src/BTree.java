@@ -53,20 +53,21 @@ public class BTree {
         }
 
         int getKeyIndex(int key) {
-            if(this.used_slots >= min_keys){
-                int beg = 0, end = max_keys - 1;
-                while (beg <= end) {
-                    int e = beg + (end - beg) / 2;
-                    if (this.entries[e].key == key)
-                        return e;
-                    else if (this.entries[e].key < key)
-                        beg = e + 1;
+            if (this.used_slots >= min_keys) {
+                int low = 0;
+                int high = max_keys - 1;
+                while (low <= high) {
+                    int mid = low + ((high - low) / 2);
+                    if (this.entries[mid] == null ||this.entries[mid].key > key) {
+                        high = mid - 1;
+                    } else if (this.entries[mid].key < key)
+                        low = mid + 1;
                     else
-                        end = e - 1;
+                        return mid;
                 }
-            }else{
-                for (int i = 0; i < max_keys; i++){
-                    if(this.entries[i].key == key){
+            } else {
+                for (int i = 0; i < min_keys; i++) {
+                    if (this.entries[i] != null && this.entries[i].key == key) {
                         return i;
                     }
                 }
