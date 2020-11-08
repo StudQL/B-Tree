@@ -2,6 +2,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/intellij+all,eclipse,java
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij+all,eclipse,java
 
+*.csv
+*.txt
+
 ### Eclipse ###
 .metadata
 bin/
@@ -183,3 +186,4 @@ modules.xml
 hs_err_pid*
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,eclipse,java
+
