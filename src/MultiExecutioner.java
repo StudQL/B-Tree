@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
@@ -13,7 +14,7 @@ class MultiExecutioner extends AbstractExecutioner {
 
      public ExecutorService initialize_executor(){
          int nbProcs = Runtime.getRuntime().availableProcessors();
-         System.out.println("Nb of available Threads :" + nbProcs);
+         //System.out.println("Nb of available Threads :" + nbProcs);
          ExecutorService executor = Executors.newFixedThreadPool(nbProcs);
          return executor;
      }
@@ -25,7 +26,7 @@ class MultiExecutioner extends AbstractExecutioner {
 
      public void stop_executor(ExecutorService executor){
          try {
-             System.out.println("attempt to shutdown executor");
+             //System.out.println("attempt to shutdown executor");
              executor.shutdown();
              executor.awaitTermination(5, TimeUnit.SECONDS);
          }
@@ -37,7 +38,7 @@ class MultiExecutioner extends AbstractExecutioner {
                  System.err.println("cancel non-finished tasks");
              }
              executor.shutdownNow();
-             System.out.println("shutdown finished");
+             //System.out.println("shutdown finished");
          }
      }
 
@@ -57,19 +58,19 @@ class MultiExecutioner extends AbstractExecutioner {
                  BTree.Entry[] entries = get(keys);
                  String text = "";
                  if(entries != null) {
-                     text = "search task success n°" + id ;
-                 }
-                 else{
-                     text = "search task finished but unsuccessful n°" + id;
+                     text = "search task success n°" + id + Arrays.toString(entries);
                  }
                  return text;
              }
              catch (Exception e) {
-                 throw new IllegalStateException("task interrupted", e);
+                 String text = "search task finished but unsuccessful n°" + id;
+                 return text ;
+                 //throw new IllegalStateException("task interrupted", e);
              }
          };
          return task;
      }
+
 
     public Callable<String> insert_task(BTree.Entry entry, int id){
         Callable<String> task = () -> {
@@ -91,8 +92,13 @@ class MultiExecutioner extends AbstractExecutioner {
         Callable<String> task = () -> {
             try {
                 rootLock.lock();
-                delete(keys);
-                rootLock.unlock();
+                try {
+                    delete(keys);
+                    rootLock.unlock();
+                }
+                catch(Exception e){
+                    rootLock.unlock();
+                }
                 String text = "delete task success n°" + id;
                 return text;
             }
@@ -106,8 +112,9 @@ class MultiExecutioner extends AbstractExecutioner {
     BTree.Entry[] get(int[] keys) {
         Object[][] node_entry_pairs = get_node_entry_pairs(keys);
         BTree.Entry[] output = new BTree.Entry[keys.length];
-        for (int i = 0; i < keys.length; i++)
+        for (int i = 0; i < keys.length; i++) {
             output[i] = (BTree.Entry) node_entry_pairs[i][1];
+        }
         return output;
     }
 
@@ -362,8 +369,12 @@ class MultiExecutioner extends AbstractExecutioner {
     @Override
     void delete(int[] keys) throws Exception {
         Object[][] node_entry_pairs = this.get_node_entry_pairs(keys);
-        for (Object[] node_entry : node_entry_pairs) {
-            single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+        if(node_entry_pairs != null){
+            for (Object[] node_entry : node_entry_pairs) {
+                System.out.println(Arrays.toString(node_entry));
+                if(node_entry != null)
+                    single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+            }
         }
     }
 
