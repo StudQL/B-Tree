@@ -1,6 +1,6 @@
 ﻿# B-Tree-Systems-4-Big-Data
 
-Library dependency :
+Dependencies :
 
 - https://github.com/nidi3/graphviz-java
 - Spark 2.4.5
