@@ -2,7 +2,6 @@
 
 Dependencies :
 
-- https://github.com/nidi3/graphviz-java 0.17.0
 - Spark 2.4.5
 - Java SDK 11
 
