@@ -2,7 +2,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/intellij+all,eclipse,java
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij+all,eclipse,java
 
-*.csv
+
 *.txt
 
 ### Eclipse ###
@@ -257,3 +257,6 @@ hs_err_pid*
 *.max
 
 # End of https://www.toptal.com/developers/gitignore/api/images
+
+archive
+archive_tests
