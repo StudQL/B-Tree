@@ -85,7 +85,7 @@ public class BTree implements Serializable {
                 int high = max_keys - 1;
                 while (low <= high) {
                     int mid = low + ((high - low) / 2);
-                    if (this.entries[mid] == null ||this.entries[mid].key > key) {
+                    if (this.entries[mid] == null || this.entries[mid].key > key) {
                         high = mid - 1;
                     } else if (this.entries[mid].key < key)
                         low = mid + 1;
@@ -130,7 +130,7 @@ public class BTree implements Serializable {
 
         int getChildNodePosition(Node n) {
             for (int i = 0; i < M; i++) {
-                if (childrenNode[i].equals(n)) {
+                if (childrenNode[i] != null && childrenNode[i].equals(n)) {
                     return i;
                 }
             }
@@ -141,11 +141,9 @@ public class BTree implements Serializable {
         public String toString() {
             return Arrays.toString(entries);
         }
-
-
     }
 
-    class Entry<T>implements Serializable {
+    class Entry<T> implements Serializable {
         int key;
         T value;
 

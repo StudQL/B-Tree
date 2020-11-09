@@ -6,43 +6,43 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 class MultiExecutioner extends AbstractExecutioner implements Serializable {
-    public Lock rootLock= new ReentrantLock();
+    public Lock rootLock = new ReentrantLock();
+    private int num_threads = Runtime.getRuntime().availableProcessors();
 
     MultiExecutioner(BTree bTree) {
         super(bTree);
     }
 
-    public ExecutorService initialize_executor(){
-        int nbProcs = Runtime.getRuntime().availableProcessors();
-        System.out.println("Nb of available Threads :" + nbProcs);
-        ExecutorService executor = Executors.newFixedThreadPool(nbProcs);
+    public ExecutorService initialize_executor(int num_threads) {
+        if (num_threads <= 0 || num_threads > Runtime.getRuntime().availableProcessors()) {
+            this.num_threads = Runtime.getRuntime().availableProcessors();
+        } else {
+            this.num_threads = num_threads;
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(this.num_threads);
         return executor;
     }
 
-    public ExecutorService initialize_executor_single(){
+    public ExecutorService initialize_executor_single() {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         return executor;
     }
 
-    public void stop_executor(ExecutorService executor){
+    public void stop_executor(ExecutorService executor) {
         try {
-            System.out.println("attempt to shutdown executor");
             executor.shutdown();
             executor.awaitTermination(5, TimeUnit.SECONDS);
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e) {
             System.err.println("tasks interrupted");
-        }
-        finally {
+        } finally {
             if (!executor.isTerminated()) {
                 System.err.println("cancel non-finished tasks");
             }
             executor.shutdownNow();
-            System.out.println("shutdown finished");
         }
     }
 
-    public List<Future<String>> execute_tasks(ExecutorService executor, List<Callable<String>> tasks){
+    public List<Future<String>> execute_tasks(ExecutorService executor, List<Callable<String>> tasks) {
         List<Future<String>> futures = null;
         try {
             futures = executor.invokeAll(tasks);
@@ -52,27 +52,25 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
         return futures;
     }
 
-    public Callable<String> search_task(int[] keys, int id){
+    public Callable<String> search_task(int[] keys, int id) {
         Callable<String> task = () -> {
             try {
                 BTree.Entry[] entries = get(keys);
                 String text = "";
-                if(entries != null) {
-                    text = "search task success n°" + id ;
-                }
-                else{
+                if (entries != null) {
+                    text = "search task success n°" + id;
+                } else {
                     text = "search task finished but unsuccessful n°" + id;
                 }
                 return text;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 throw new IllegalStateException("task interrupted", e);
             }
         };
         return task;
     }
 
-    public Callable<String> insert_task(BTree.Entry entry, int id){
+    public Callable<String> insert_task(BTree.Entry entry, int id) {
         Callable<String> task = () -> {
             try {
                 rootLock.lock();
@@ -80,42 +78,48 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
                 rootLock.unlock();
                 String text = "insert task success n°" + id;
                 return text;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 throw new IllegalStateException("task interrupted", e);
             }
         };
         return task;
     }
 
-    public Callable<String> delete_task(int[] keys, int id){
+    public Callable<String> delete_task(int[] keys, int id) {
         Callable<String> task = () -> {
+            rootLock.lock();
             try {
-                rootLock.lock();
                 delete(keys);
-                rootLock.unlock();
                 String text = "delete task success n°" + id;
                 return text;
+            } catch (Exception e) {
             }
-            catch (Exception e) {
-                throw new IllegalStateException("task interrupted", e);
-            }
+            rootLock.unlock();
+            return null;
         };
         return task;
     }
 
+    @Override
     BTree.Entry[] get(int[] keys) {
-        Object[][] node_entry_pairs = get_node_entry_pairs(keys);
         BTree.Entry[] output = new BTree.Entry[keys.length];
-        for (int i = 0; i < keys.length; i++)
-            output[i] = (BTree.Entry) node_entry_pairs[i][1];
+        for (int i = 0; i < keys.length; i++) {
+            Object[] x = single_get(keys[i]);
+            if (x != null) {
+                output[i] = (BTree.Entry) single_get(keys[i])[1];
+            }
+        }
         return output;
     }
 
     private Object[][] get_node_entry_pairs(int[] keys) {
         Object[][] output = new Object[keys.length][2];
-        for (int i = 0; i < keys.length; i++)
-            output[i] = single_get(keys[i]);
+        for (int i = 0; i < keys.length; i++) {
+            Object[] x = single_get(keys[i]);
+            if (x != null) {
+                output[i] = x;
+            }
+        }
         return output;
     }
 
@@ -133,9 +137,7 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
                     if (root.entries[i].key == key) {
                         root.lock.readLock().unlock();
                         return new Object[]{root, root.entries[i]};
-                    }
-
-                    else if (root.entries[i].key > key) {
+                    } else if (root.entries[i].key > key) {
                         root.lock.readLock().unlock();
                         root = root.childrenNode[i];
                         root.lock.readLock().lock();
@@ -147,18 +149,16 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
         if (root.getKeyIndex(key) != -1) {
             root.lock.readLock().unlock();
             return new Object[]{root, root.entries[root.getKeyIndex(key)]};
-        }
-        else
+        } else
             return null;
     }
 
     @Override
     void insert(BTree.Entry[] entries) {
-        ExecutorService executor = initialize_executor();
+        ExecutorService executor = initialize_executor(this.num_threads);
         List<Callable<String>> tasks = new ArrayList<>();
         int id = 0;
         for (BTree.Entry entry : entries) {
-            System.out.println(entry);
             try {
                 Callable<String> task = insert_task(entry, id);
                 tasks.add(task);
@@ -168,7 +168,7 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
             id++;
         }
         List<Future<String>> futures = execute_tasks(executor, tasks);
-        for(Future<String> future : futures){
+        for (Future<String> future : futures) {
             try {
                 System.out.println(future.get());
             } catch (InterruptedException e) {
@@ -313,11 +313,10 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
         node.used_slots = mid;
 
         //for recursive call
-        if (node.childrenNode != null)
-        {
+        if (node.childrenNode != null) {
             rightNode.childrenNode = new BTree.Node[bT.M];
-            for (int i = 0; i < mid; i++)
-            {   rightNode.childrenNode[i] = node.childrenNode[i + mid + 1];
+            for (int i = 0; i < mid; i++) {
+                rightNode.childrenNode[i] = node.childrenNode[i + mid + 1];
                 node.childrenNode[mid + 1 + i] = null;
                 rightNode.childrenNode[i].parentNode = rightNode;
             }
@@ -332,31 +331,29 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
 
         int index = parent.used_slots;
         BTree.Entry midEntry = node.entries[mid];
-        for(int i=mid; i<2*mid; i++)
+        for (int i = mid; i < 2 * mid; i++)
             node.entries[i] = null;
 
-        for(int i=parent.used_slots-1; i>-1;i--)
-        {   if(midEntry.key<parent.entries[i].key)
-        {
-            parent.entries[i+1] = parent.entries[i];
-            parent.childrenNode[i+2] = parent.childrenNode[i+1];
-            index = i;
-        }
-        else break;
+        for (int i = parent.used_slots - 1; i > -1; i--) {
+            if (midEntry.key < parent.entries[i].key) {
+                parent.entries[i + 1] = parent.entries[i];
+                parent.childrenNode[i + 2] = parent.childrenNode[i + 1];
+                index = i;
+            } else break;
         }
         parent.entries[index] = midEntry;
-        parent.childrenNode[index+1] = rightNode;
+        parent.childrenNode[index + 1] = rightNode;
         parent.used_slots++;
         rightNode.parentNode = parent;
         rightNode.leftSibling = node;
         rightNode.rightSibling = node.rightSibling;
         node.rightSibling = rightNode;
 
-        if(index + 1 != bT.M-1)
-            if(parent.childrenNode[index+2] != null)
-                parent.childrenNode[index+2].leftSibling = rightNode;
+        if (index + 1 != bT.M - 1)
+            if (parent.childrenNode[index + 2] != null)
+                parent.childrenNode[index + 2].leftSibling = rightNode;
 
-        if(entry.key>midEntry.key) return rightNode;
+        if (entry.key > midEntry.key) return rightNode;
         return node;
     }
 
@@ -364,7 +361,12 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
     void delete(int[] keys) throws Exception {
         Object[][] node_entry_pairs = this.get_node_entry_pairs(keys);
         for (Object[] node_entry : node_entry_pairs) {
-            single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+            if (node_entry != null && node_entry[0] != null && node_entry[1] != null) {
+                try {
+                    single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+                } catch (Exception e) {
+                }
+            }
         }
     }
 
@@ -389,7 +391,7 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
             BTree.Entry backup = e_node.entries[index];
             if (inorder.used_slots > bT.min_keys) {
                 e_node.entries[index] = inorder.entries[inorder.used_slots - 1];
-                inorder.entries[inorder.used_slots-1] = backup;
+                inorder.entries[inorder.used_slots - 1] = backup;
             } else {
                 inorder = getInorderSuccessorNode(e_node, index);
                 e_node.entries[index] = inorder.entries[0];
@@ -466,7 +468,6 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
         // remove entry from sibling, store leftChildNode, remove leftChildNode
         node.rightSibling.entries[0] = null;
         shift_entries_left(node.rightSibling);
-        node.rightSibling.used_slots--;
 
         // set new entries and child node
         node.parentNode.entries[node_pos] = new_parent_entry;
@@ -477,11 +478,12 @@ class MultiExecutioner extends AbstractExecutioner implements Serializable {
             BTree.Node leftChild = node.rightSibling.childrenNode[0];
             node.rightSibling.childrenNode[0] = null;
             shift_children_left(node.rightSibling);
-            node.childrenNode[node.used_slots + 1] = leftChild;
+            node.childrenNode[node.used_slots] = leftChild;
             leftChild.parentNode = node;
             leftChild.leftSibling = node.childrenNode[node.used_slots];
             leftChild.rightSibling = null;
         }
+        node.rightSibling.used_slots--;
 
     }
 

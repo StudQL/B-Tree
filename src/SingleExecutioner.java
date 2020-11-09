@@ -1,6 +1,4 @@
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 class SingleExecutioner extends AbstractExecutioner implements Serializable {
 
@@ -10,20 +8,24 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
 
     @Override
     BTree.Entry[] get(int[] keys) {
-        Object[][] node_entry_pairs = get_node_entry_pairs(keys);
-        List<BTree.Entry> output = new ArrayList<BTree.Entry>();
+        BTree.Entry[] output = new BTree.Entry[keys.length];
         for (int i = 0; i < keys.length; i++) {
-            if (node_entry_pairs[i] != null) {
-                output.add((BTree.Entry) node_entry_pairs[i][1]);
+            Object[] x = single_get(keys[i]);
+            if (x != null) {
+                output[i] = (BTree.Entry) single_get(keys[i])[1];
             }
         }
-        return output.toArray(new BTree.Entry[output.size()]);
+        return output;
     }
 
     private Object[][] get_node_entry_pairs(int[] keys) {
         Object[][] output = new Object[keys.length][2];
-        for (int i = 0; i < keys.length; i++)
-            output[i] = single_get(keys[i]);
+        for (int i = 0; i < keys.length; i++) {
+            Object[] x = single_get(keys[i]);
+            if (x != null) {
+                output[i] = x;
+            }
+        }
         return output;
     }
 
@@ -96,7 +98,6 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
                     break;
                 }
             }
-            //System.out.println(temp + " "+ entry.key);
         }
 
         if (temp.used_slots == bT.max_keys) {
@@ -307,7 +308,9 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
     void delete(int[] keys) throws Exception {
         Object[][] node_entry_pairs = this.get_node_entry_pairs(keys);
         for (Object[] node_entry : node_entry_pairs) {
-            single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+            if (node_entry != null && node_entry[0] != null && node_entry[1] != null) {
+                single_delete((BTree.Node) node_entry[0], (BTree.Entry) node_entry[1]);
+            }
         }
     }
 
@@ -381,7 +384,6 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
 
         // remove entry from sibling, store rightChildNode, remove rightChildNode
         node.leftSibling.entries[node.leftSibling.used_slots - 1] = null;
-        node.leftSibling.used_slots--;
 
         // set new entries and child node
         node.parentNode.entries[node_pos - 1] = new_parent_entry;
@@ -397,6 +399,7 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
             rightChild.rightSibling = node.childrenNode[1];
             rightChild.leftSibling = null;
         }
+        node.leftSibling.used_slots--;
 
     }
 
@@ -409,7 +412,6 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
         // remove entry from sibling, store leftChildNode, remove leftChildNode
         node.rightSibling.entries[0] = null;
         shift_entries_left(node.rightSibling);
-        node.rightSibling.used_slots--;
 
         // set new entries and child node
         node.parentNode.entries[node_pos] = new_parent_entry;
@@ -420,11 +422,12 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
             BTree.Node leftChild = node.rightSibling.childrenNode[0];
             node.rightSibling.childrenNode[0] = null;
             shift_children_left(node.rightSibling);
-            node.childrenNode[node.used_slots + 1] = leftChild;
+            node.childrenNode[node.used_slots] = leftChild;
             leftChild.parentNode = node;
             leftChild.leftSibling = node.childrenNode[node.used_slots];
             leftChild.rightSibling = null;
         }
+        node.rightSibling.used_slots--;
 
     }
 
@@ -485,8 +488,9 @@ class SingleExecutioner extends AbstractExecutioner implements Serializable {
             }
             node.used_slots++;
         }
+        if (!node.isLeaf) {
         node.childrenNode[node.used_slots] = node.rightSibling.childrenNode[node.rightSibling.used_slots];
-
+        }
         node.rightSibling = node.rightSibling.rightSibling;
         if (node.parentNode.isRoot && node.parentNode.used_slots - 1 == 0) {
             node.isRoot = true;

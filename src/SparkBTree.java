@@ -50,6 +50,7 @@ public class SparkBTree<T> implements Serializable {
             result.add(bt);
             return result.iterator();
         }, true);
+        System.out.println("Number of threads/partitions : " + data.getNumPartitions());
     }
 
     public JavaRDD<BTree.Entry> get(List<Integer> keys) {
@@ -96,7 +97,6 @@ public class SparkBTree<T> implements Serializable {
 
             @Override
             public Iterator<BTree.Entry> call(Integer integer, Iterator<BTree> bTreeIterator) {
-                System.out.println("hi");
                 if (bTreeIterator.hasNext()) {
                     ArrayList<BTree.Entry<T>> entries = new ArrayList<>();
                     BTree bt = bTreeIterator.next();
