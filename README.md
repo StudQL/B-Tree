@@ -2,9 +2,9 @@
 
 Library dependency :
 
-https://github.com/nidi3/graphviz-java
-Spark 2.4.5
-Java SDK 11
+- https://github.com/nidi3/graphviz-java
+- Spark 2.4.5
+- Java SDK 11
 
 Dataset link:
 
